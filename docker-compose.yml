@@ -32,6 +32,16 @@ services:
       - employee-net
     depends_on:
       - db
+  migrate:
+    image: migrate/migrate
+    container_name: migrate
+    volumes:
+      - ./migrations:/migrations
+    command: [ "-path", "/migrations", "-database", "postgres://admin:admin123@db:5432/employee_db?sslmode=disable", "up" ]
+    depends_on:
+      - db
+    networks:
+      - employee-net
 
 networks:
   employee-net:
