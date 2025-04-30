@@ -1,44 +1,68 @@
 package services
 
 import (
+	"errors"
+	"gorm.io/gorm"
 	"hrSys/employee-database/models"
-	"hrSys/employee-database/repositories"
 )
 
-type EmployeeService interface {
-	CreateEmployee(employee *models.Employee) (*models.Employee, error)
-	GetAllEmployees() ([]models.Employee, error)
-	GetEmployeeByID(id string) (*models.Employee, error)
-	UpdateEmployee(id string, employee *models.Employee) (*models.Employee, error)
-	DeleteEmployee(id string) error
+type EmployeeService struct {
+	DB *gorm.DB
 }
 
-type employeeService struct {
-	employeeRepo repositories.EmployeeRepository
+func NewEmployeeService(db *gorm.DB) *EmployeeService {
+	return &EmployeeService{DB: db}
 }
 
-func NewEmployeeService(repo repositories.EmployeeRepository) EmployeeService {
-	return &employeeService{
-		employeeRepo: repo,
+func (s *EmployeeService) CreateEmployee(employee *models.Employee) (*models.Employee, error) {
+	if err := s.DB.Create(employee).Error; err != nil {
+		return nil, err
 	}
+	return employee, nil
 }
 
-func (s *employeeService) CreateEmployee(employee *models.Employee) (*models.Employee, error) {
-	return s.employeeRepo.Create(employee)
+func (s *EmployeeService) GetAllEmployees() ([]models.Employee, error) {
+	var employees []models.Employee
+	if err := s.DB.Find(&employees).Error; err != nil {
+		return nil, err
+	}
+	return employees, nil
 }
 
-func (s *employeeService) GetAllEmployees() ([]models.Employee, error) {
-	return s.employeeRepo.FindAll()
+func (s *EmployeeService) GetEmployeeByID(id uint) (*models.Employee, error) {
+	var employee models.Employee
+	if err := s.DB.First(&employee, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &employee, nil
 }
 
-func (s *employeeService) GetEmployeeByID(id string) (*models.Employee, error) {
-	return s.employeeRepo.FindByID(id)
+func (s *EmployeeService) UpdateEmployee(id uint, employee *models.Employee) (*models.Employee, error) {
+	var existing models.Employee
+	if err := s.DB.First(&existing, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	existing.Name = employee.Name
+	existing.Position = employee.Position
+	existing.Department = employee.Department
+	existing.Salary = employee.Salary
+
+	if err := s.DB.Save(&existing).Error; err != nil {
+		return nil, err
+	}
+	return &existing, nil
 }
 
-func (s *employeeService) UpdateEmployee(id string, employee *models.Employee) (*models.Employee, error) {
-	return s.employeeRepo.Update(employee)
-}
-
-func (s *employeeService) DeleteEmployee(id string) error {
-	return s.employeeRepo.Delete(id)
+func (s *EmployeeService) DeleteEmployee(id uint) error {
+	if err := s.DB.Delete(&models.Employee{}, id).Error; err != nil {
+		return err
+	}
+	return nil
 }

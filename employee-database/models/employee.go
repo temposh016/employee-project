@@ -1,10 +1,11 @@
 package models
 
+import "gorm.io/gorm"
+
 type Employee struct {
-	ID        uint   `json:"id" gorm:"primary_key"`
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
-	Email     string `json:"email"`
-	Position  string `json:"position"`
-	Salary    int    `json:"salary"`
+	gorm.Model
+	Name       string  `json:"name"`
+	Position   string  `json:"position"`
+	Department string  `json:"department"`
+	Salary     float64 `json:"salary"`
 }

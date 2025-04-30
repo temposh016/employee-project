@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   db:
@@ -14,32 +14,27 @@ services:
       - ./db_data:/var/lib/postgresql/data
     networks:
       - employee-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d employee_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   app:
     build: .
     container_name: hrSys
     ports:
-      - "8080:8080"
+      - "8081:8080"
+    working_dir: /app
     environment:
-      DB_HOST: "employee-db"
+      DB_HOST: "db"
       DB_PORT: "5432"
       DB_USER: "admin"
       DB_PASSWORD: "admin123"
       DB_NAME: "employee_db"
-    volumes:
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
-    networks:
-      - employee-net
     depends_on:
-      - db
-  migrate:
-    image: migrate/migrate
-    container_name: migrate
-    volumes:
-      - ./migrations:/migrations
-    command: [ "-path", "/migrations", "-database", "postgres://admin:admin123@db:5432/employee_db?sslmode=disable", "up" ]
-    depends_on:
-      - db
+      db:
+        condition: service_healthy
     networks:
       - employee-net
 

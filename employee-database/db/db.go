@@ -1,38 +1,61 @@
 package db
 
 import (
+	"database/sql"
 	"fmt"
-	"github.com/jinzhu/gorm"
-	_ "github.com/jinzhu/gorm/dialects/postgres"
-	"github.com/joho/godotenv"
 	"log"
-	"os"
+
+	"github.com/golang-migrate/migrate/v4"
+	migratepg "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
-// DB переменная для подключения к базе данных
 var DB *gorm.DB
 
-// Инициализация подключения к базе данных
-func Init() error {
-	// Загружаем переменные из .env файла
-	err := godotenv.Load()
+func InitDB() {
+	dbHost := "db"
+	dbName := "employee_db"
+	dbUser := "admin"
+	dbPass := "admin123"
+	dbPort := "5432"
+	sslmode := "disable"
+	dbUrl := fmt.Sprintf(
+		"postgres://%s:%s@%s:%s/%s?sslmode=%s",
+		dbUser, dbPass, dbHost, dbPort, dbName, sslmode,
+	)
+
+	sqlDB, err := sql.Open("postgres", dbUrl)
 	if err != nil {
-		log.Fatal("Error loading .env file")
+		log.Fatal("failed to open sql connection:", err)
 	}
 
-	// Получаем значения из переменных окружения
-	connStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
-		os.Getenv("DB_USER"),
-		os.Getenv("DB_PASSWORD"),
-		os.Getenv("DB_HOST"),
-		os.Getenv("DB_PORT"),
-		os.Getenv("DB_NAME"))
-
-	// Подключаемся к базе данных
-	db, err := gorm.Open("postgres", connStr)
+	driver, err := migratepg.WithInstance(sqlDB, &migratepg.Config{})
 	if err != nil {
-		return err // Возвращаем ошибку, если подключение не удалось
+		log.Fatal("failed to create migrate driver:", err)
 	}
-	DB = db
-	return nil // Возвращаем nil, если подключение успешно
+
+	m, err := migrate.NewWithDatabaseInstance(
+		"file://employee-database/db/migrations",
+		"postgres",
+		driver,
+	)
+	if err != nil {
+		log.Fatal("failed to create migrate instance:", err)
+	}
+
+	if err := m.Up(); err != nil && err.Error() != "no change" {
+		log.Fatal("failed to apply migrations:", err)
+	}
+
+	gormDB, err := gorm.Open(postgres.New(postgres.Config{
+		Conn: sqlDB,
+	}), &gorm.Config{})
+	if err != nil {
+		log.Fatal("failed to connect with GORM:", err)
+	}
+
+	DB = gormDB
+	log.Println("✅ Database initialized and migrated successfully")
 }

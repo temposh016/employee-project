@@ -1,33 +1,26 @@
-# Этап сборки (builder)
+# Этап сборки
 FROM golang:1.23-alpine AS builder
-
-# Установим рабочую директорию
 WORKDIR /app
 
-# Копируем go.mod и go.sum
 COPY go.mod go.sum ./
+COPY vendor ./vendor
+ENV GOFLAGS=-mod=vendor
 
-# Загружаем зависимости
-RUN go mod tidy
+# Копируем миграции ДО сборки
+COPY employee-database/db/migrations ./employee-database/db/migrations
 
-# Копируем весь код
-COPY . ./
+COPY . .
 
-# Сборка приложения
 RUN go build -o main .
 
-# Этап с минимальным образом (stage-2)
 FROM alpine:latest
-
-# Устанавливаем сертификаты
 RUN apk --no-cache add ca-certificates
 
-# Копируем собранный файл из предыдущего этапа
 COPY --from=builder /app/main /main
-COPY .env .env
+COPY .env /app/.env
 
-# Открываем порт
+COPY employee-database/db/migrations /app/employee-database/db/migrations
+
+WORKDIR /app
 EXPOSE 8080
-
-# Запуск приложения
 CMD ["/main"]

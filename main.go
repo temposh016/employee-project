@@ -1,39 +1,35 @@
 package main
 
 import (
-	"fmt"
-	"hrSys/employee-database/db"
-	"hrSys/employee-database/routes"
 	"log"
-	"time"
+
+	"github.com/gin-gonic/gin"
+	"hrSys/employee-database/auth"
+	"hrSys/employee-database/db"
+	"hrSys/employee-database/handlers"
+	"hrSys/employee-database/middleware"
+	"hrSys/employee-database/services"
 )
 
 func main() {
-	// Пытаемся подключиться к базе данных несколько раз с задержкой
-	var err error
-	for i := 0; i < 5; i++ {
-		err = db.Init()
-		if err == nil {
-			fmt.Println("Успешное подключение к базе данных!")
-			break
-		}
+	db.InitDB()
 
-		log.Println("Ошибка при подключении к базе данных, пробую снова...")
-		time.Sleep(5 * time.Second) // Задержка между попытками
+	employeeService := services.NewEmployeeService(db.DB)
+	employeeHandler := handlers.NewEmployeeHandler(employeeService)
+
+	router := gin.Default()
+	router.POST("/login", auth.Login)
+
+	protected := router.Group("/", middleware.JwtAuthMiddleware())
+	{
+		protected.POST("/employees", employeeHandler.CreateEmployee)
+		protected.GET("/employees", employeeHandler.GetAllEmployees)
+		protected.GET("/employees/:id", employeeHandler.GetEmployeeByID)
+		protected.PUT("/employees/:id", employeeHandler.UpdateEmployee)
+		protected.DELETE("/employees/:id", middleware.RoleMiddleware("admin"), employeeHandler.DeleteEmployee)
 	}
 
-	// Если ошибка подключения сохраняется, завершаем работу
-	if err != nil {
-		log.Fatalf("Не удалось подключиться к базе данных: %v\n", err)
-	}
-
-	// Настройка маршрутов
-	r := routes.SetupRouter()
-
-	// Запуск сервера
-	if err := r.Run(":8080"); err != nil {
-		log.Fatal("Error starting server: ", err)
-	} else {
-		fmt.Println("Server started at http://localhost:8080")
+	if err := router.Run(":8080"); err != nil {
+		log.Fatalf("Ошибка запуска сервера: %v", err)
 	}
 }

@@ -1,17 +1,19 @@
 package handlers
 
 import (
+	"net/http"
+	"strconv"
+
 	"github.com/gin-gonic/gin"
 	"hrSys/employee-database/models"
 	"hrSys/employee-database/services"
-	"net/http"
 )
 
 type EmployeeHandler struct {
-	employeeService services.EmployeeService
+	employeeService *services.EmployeeService
 }
 
-func NewEmployeeHandler(service services.EmployeeService) *EmployeeHandler {
+func NewEmployeeHandler(service *services.EmployeeService) *EmployeeHandler {
 	return &EmployeeHandler{
 		employeeService: service,
 	}
@@ -39,44 +41,51 @@ func (h *EmployeeHandler) GetAllEmployees(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch employees"})
 		return
 	}
-
 	c.JSON(http.StatusOK, employees)
 }
 
 func (h *EmployeeHandler) GetEmployeeByID(c *gin.Context) {
-	id := c.Param("id")
-	employee, err := h.employeeService.GetEmployeeByID(id)
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+		return
+	}
+	employee, err := h.employeeService.GetEmployeeByID(uint(id))
 	if err != nil || employee == nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Employee not found"})
 		return
 	}
-
 	c.JSON(http.StatusOK, employee)
 }
 
 func (h *EmployeeHandler) UpdateEmployee(c *gin.Context) {
-	id := c.Param("id")
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+		return
+	}
 	var employee models.Employee
 	if err := c.ShouldBindJSON(&employee); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
 		return
 	}
-
-	updatedEmployee, err := h.employeeService.UpdateEmployee(id, &employee)
+	updatedEmployee, err := h.employeeService.UpdateEmployee(uint(id), &employee)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update employee"})
 		return
 	}
-
 	c.JSON(http.StatusOK, updatedEmployee)
 }
 
 func (h *EmployeeHandler) DeleteEmployee(c *gin.Context) {
-	id := c.Param("id")
-	if err := h.employeeService.DeleteEmployee(id); err != nil {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+		return
+	}
+	if err := h.employeeService.DeleteEmployee(uint(id)); err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Employee not found"})
 		return
 	}
-
 	c.JSON(http.StatusOK, gin.H{"message": "Employee deleted"})
 }
