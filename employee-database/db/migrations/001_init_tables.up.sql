@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS employees (
    id SERIAL PRIMARY KEY,
-     name TEXT NOT NULL,
-    position TEXT NOT NULL,
-    department TEXT NOT NULL,
-     salary DOUBLE PRECISION NOT NULL
+   name TEXT NOT NULL,
+   position TEXT NOT NULL,
+   department TEXT NOT NULL,
+   salary DOUBLE PRECISION NOT NULL
 );

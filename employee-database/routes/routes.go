@@ -5,28 +5,23 @@ import (
 	"hrSys/employee-database/auth"
 	"hrSys/employee-database/handlers"
 	"hrSys/employee-database/middleware"
-	"hrSys/employee-database/repositories"
-	"hrSys/employee-database/services"
 )
 
-func SetupRouter() *gin.Engine {
-
-	r := gin.Default()
+func SetupRouter(r *gin.Engine, employeeHandler *handlers.EmployeeHandler) {
+	// публичные
 	r.POST("/login", auth.Login)
+	r.POST("/register", auth.Register)
 
-	employeeRepo := repositories.NewEmployeeRepository()
-	employeeService := services.NewEmployeeService(employeeRepo)
-	employeeHandler := handlers.NewEmployeeHandler(employeeService)
-
-	api := r.Group("/employees")
-	api.Use(middleware.JwtAuthMiddleware())
+	// все /employees — только для авторизованных
+	emp := r.Group("/employees")
+	emp.Use(middleware.AuthMiddleware())
 	{
-		api.POST("", employeeHandler.CreateEmployee)
-		api.GET("", employeeHandler.GetAllEmployees)
-		api.GET("/:id", employeeHandler.GetEmployeeByID)
-		api.PUT("/:id", employeeHandler.UpdateEmployee)
-		api.DELETE("/:id", employeeHandler.DeleteEmployee)
-	}
+		emp.GET("", employeeHandler.GetAllEmployees)
+		emp.GET("/:id", employeeHandler.GetEmployeeByID)
 
-	return r
+		// только для админа
+		emp.POST("", middleware.RoleMiddleware("admin"), employeeHandler.CreateEmployee)
+		emp.PUT("/:id", middleware.RoleMiddleware("admin"), employeeHandler.UpdateEmployee)
+		emp.DELETE("/:id", middleware.RoleMiddleware("admin"), employeeHandler.DeleteEmployee)
+	}
 }

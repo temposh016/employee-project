@@ -1,56 +1,44 @@
 package middleware
 
 import (
-	"net/http"
-	"strings"
-
+	"errors"
 	"github.com/dgrijalva/jwt-go"
-	"github.com/gin-gonic/gin"
+	"time"
 )
 
 var JwtKey = []byte("super_secret_key")
 
+// Claims — в токене будем хранить user_id и роль
 type Claims struct {
-	Username string `json:"username"`
-	Role     string `json:"role"`
+	UserID uint   `json:"user_id"`
+	Role   string `json:"role"`
 	jwt.StandardClaims
 }
 
-func JwtAuthMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header required"})
-			c.Abort()
-			return
-		}
-
-		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
-		claims := &Claims{}
-
-		token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
-			return JwtKey, nil
-		})
-
-		if err != nil || !token.Valid {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
-			c.Abort()
-			return
-		}
-
-		c.Set("username", claims.Username)
-		c.Set("role", claims.Role)
-		c.Next()
+// GenerateJWT теперь принимает userID (uint) и role (string)
+func GenerateJWT(userID uint, role string) (string, error) {
+	expirationTime := time.Now().Add(24 * time.Hour)
+	claims := &Claims{
+		UserID: userID,
+		Role:   role,
+		StandardClaims: jwt.StandardClaims{
+			ExpiresAt: expirationTime.Unix(),
+			IssuedAt:  time.Now().Unix(),
+		},
 	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(JwtKey)
 }
 
-func RoleMiddleware(role string) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		if r, exists := c.Get("role"); !exists || r != role {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Forbidden"})
-			c.Abort()
-			return
-		}
-		c.Next()
+// ParseJWT возвращает ваши Claims с полями UserID и Role
+func ParseJWT(tokenStr string) (*Claims, error) {
+	claims := &Claims{}
+	token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
+		return JwtKey, nil
+	})
+	if err != nil || !token.Valid {
+		return nil, errors.New("invalid token")
 	}
+	return claims, nil
 }

@@ -1,68 +1,58 @@
 package services
 
 import (
-	"errors"
-	"gorm.io/gorm"
 	"hrSys/employee-database/models"
+	"hrSys/employee-database/repositories"
 )
 
 type EmployeeService struct {
-	DB *gorm.DB
+	repo repositories.EmployeeRepository
 }
 
-func NewEmployeeService(db *gorm.DB) *EmployeeService {
-	return &EmployeeService{DB: db}
+// NewEmployeeService теперь принимает репозиторий, а не *gorm.DB
+func NewEmployeeService(repo repositories.EmployeeRepository) *EmployeeService {
+	return &EmployeeService{repo: repo}
 }
 
-func (s *EmployeeService) CreateEmployee(employee *models.Employee) (*models.Employee, error) {
-	if err := s.DB.Create(employee).Error; err != nil {
-		return nil, err
-	}
-	return employee, nil
+func (s *EmployeeService) CreateEmployee(e *models.Employee) (*models.Employee, error) {
+	return s.repo.Create(e)
 }
 
 func (s *EmployeeService) GetAllEmployees() ([]models.Employee, error) {
-	var employees []models.Employee
-	if err := s.DB.Find(&employees).Error; err != nil {
-		return nil, err
-	}
-	return employees, nil
+	return s.repo.FindAll()
 }
 
 func (s *EmployeeService) GetEmployeeByID(id uint) (*models.Employee, error) {
-	var employee models.Employee
-	if err := s.DB.First(&employee, id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
-		}
+	emp, err := s.repo.FindByID(id)
+	if err != nil {
 		return nil, err
 	}
-	return &employee, nil
+	if emp == nil {
+		// можно возвращать nil,nil, чтобы хэндлер сам делал 404
+		return nil, nil
+	}
+	return emp, nil
 }
 
-func (s *EmployeeService) UpdateEmployee(id uint, employee *models.Employee) (*models.Employee, error) {
-	var existing models.Employee
-	if err := s.DB.First(&existing, id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
-		}
+func (s *EmployeeService) UpdateEmployee(id uint, data *models.Employee) (*models.Employee, error) {
+	// сначала проверим, есть ли запись
+	existing, err := s.repo.FindByID(id)
+	if err != nil {
 		return nil, err
 	}
-
-	existing.Name = employee.Name
-	existing.Position = employee.Position
-	existing.Department = employee.Department
-	existing.Salary = employee.Salary
-
-	if err := s.DB.Save(&existing).Error; err != nil {
-		return nil, err
+	if existing == nil {
+		return nil, nil
 	}
-	return &existing, nil
+	// обновляем поля
+	existing.Name = data.Name
+	existing.Position = data.Position
+	existing.Department = data.Department
+	existing.Salary = data.Salary
+
+	return s.repo.Update(existing)
 }
 
 func (s *EmployeeService) DeleteEmployee(id uint) error {
-	if err := s.DB.Delete(&models.Employee{}, id).Error; err != nil {
-		return err
-	}
-	return nil
+	// можно тоже сначала проверить, есть ли запись, но не обязательно
+	return s.repo.Delete(id)
 }
